@@ -22,3 +22,6 @@ To start the development server, run:
 ```bash
 npm run dev
 ```
+
+### Example
+![Library _ Loom - 16 January 2025](https://github.com/user-attachments/assets/9cfb9e22-997d-4c36-a771-116a894d928d)
