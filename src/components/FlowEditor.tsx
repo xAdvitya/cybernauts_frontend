@@ -7,19 +7,16 @@ import ReactFlow, {
   applyNodeChanges,
   applyEdgeChanges,
   addEdge,
+  NodeChange,
+  EdgeChange,
 } from 'reactflow';
 import axios from 'axios';
 import Sidebar from './SideBar';
 import 'reactflow/dist/style.css';
 
 const FlowEditor: React.FC = () => {
-  // State to hold the nodes (users and hobbies) in the flow chart
   const [nodes, setNodes] = useState<Node[]>([]);
-
-  // State to hold the edges (connections between users and their hobbies)
   const [edges, setEdges] = useState<Edge[]>([]);
-
-  // Predefined hobbies that can be dragged into the flow editor
   const [hobbies] = useState<string[]>([
     'Reading',
     'Gaming',
@@ -27,18 +24,12 @@ const FlowEditor: React.FC = () => {
     'Swimming',
     'Running',
   ]);
-
-  // State to keep track of the currently dragged hobby
-  const [draggedHobby, setDraggedHobby] = useState<string | null>(null);
-
-  // State to store a new hobby node when dropped into the editor
   const [newHobbyNode, setNewHobbyNode] = useState<Node | null>(null);
 
-  // Effect hook to fetch user data from the backend API
+  // Fetching user data from the backend API when the component mounts
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetching user data from the API
         const response = await axios.get(
           'https://cybernauts-backend.onrender.com/api/users'
         );
@@ -47,11 +38,9 @@ const FlowEditor: React.FC = () => {
         const newNodes: Node[] = [];
         const newEdges: Edge[] = [];
 
-        // Looping through the fetched users and creating nodes for each user and their hobbies
+        // Loop through each user and add their node and hobby nodes
         data.forEach((user: any, userIndex: number) => {
           const mainNodeId = `user-${user._id}`;
-
-          // Create a node for the user
           newNodes.push({
             id: mainNodeId,
             data: {
@@ -61,7 +50,7 @@ const FlowEditor: React.FC = () => {
             position: { x: userIndex, y: userIndex * 300 },
           });
 
-          // Create hobby nodes and connect them to the user node
+          // Loop through hobbies and create corresponding hobby nodes
           user.hobbies.forEach((hobby: string, hobbyIndex: number) => {
             const hobbyNodeId = `${mainNodeId}-hobby-${hobbyIndex}`;
             newNodes.push({
@@ -73,7 +62,7 @@ const FlowEditor: React.FC = () => {
               },
             });
 
-            // Add an edge connecting the user node to each hobby node
+            // Create edges between user node and hobby nodes
             newEdges.push({
               id: `edge-${mainNodeId}-${hobbyNodeId}`,
               source: mainNodeId,
@@ -82,7 +71,7 @@ const FlowEditor: React.FC = () => {
           });
         });
 
-        // Updating the state with the fetched nodes and edges
+        // Update state with the new nodes and edges
         setNodes(newNodes);
         setEdges(newEdges);
       } catch (error) {
@@ -90,22 +79,20 @@ const FlowEditor: React.FC = () => {
       }
     };
 
-    fetchData(); // Call the function to fetch the data
-  }, []); // Empty dependency array means this effect runs once on component mount
+    fetchData();
+  }, []);
 
-  // Handler for the drag start event on the hobbies
+  // Handles the drag start event by setting the dragged hobby
   const onDragStart = (event: React.DragEvent, hobby: string) => {
-    // Store the dragged hobby in the state for future reference
     event.dataTransfer.setData('text/plain', hobby);
-    setDraggedHobby(hobby);
+    setNewHobbyNode(null); // Reset new hobby node on drag start
   };
 
-  // Handler for the drop event when a hobby is dropped into the editor
+  // Handles the drop event by adding a new hobby node to the flow
   const onDrop = async (event: React.DragEvent) => {
     const hobby = event.dataTransfer.getData('text/plain');
     if (!hobby) return;
 
-    // Capture the drop position and create a new hobby node
     const dropPosition = { x: event.clientX, y: event.clientY };
     const newHobbyNodeId = `hobby-${Date.now()}`;
     const newHobbyNode: Node = {
@@ -114,46 +101,41 @@ const FlowEditor: React.FC = () => {
       position: dropPosition,
     };
 
-    // Set the new hobby node to the state and add it to the nodes array
     setNewHobbyNode(newHobbyNode);
     setNodes((nds) => [...nds, newHobbyNode]);
   };
 
-  // Handler for the drag over event to allow dropping
+  // Prevent the default behavior of the drag over event to allow dropping
   const onDragOver = (event: React.DragEvent) => {
-    event.preventDefault(); // Necessary to allow the drop
+    event.preventDefault();
   };
 
-  // Handler for changes in nodes (moving or resizing)
+  // Explicitly type the parameter 'changes' as NodeChange[] for onNodesChange
   const onNodesChange = useCallback(
-    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
+    (changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)),
     []
   );
 
-  // Handler for changes in edges (connecting nodes)
+  // Explicitly type the parameter 'changes' as EdgeChange[] for onEdgesChange
   const onEdgesChange = useCallback(
-    (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
+    (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
     []
   );
 
-  // Handler for when a new connection is made between nodes (dragging edges)
+  // Handles creating edges between nodes and updating user data with new hobbies
   const onConnect = useCallback(
     async (params: any) => {
-      // Add the new edge to the state
       setEdges((eds) => addEdge(params, eds));
-
-      // Find the user node connected by the edge
       const targetUserNode = nodes.find(
         (node) => node.id === params.source || node.id === params.target
       );
 
-      // If a valid user node and new hobby node are found, update the user's hobbies
       if (targetUserNode && targetUserNode.data.userId && newHobbyNode) {
         const userId = targetUserNode.data.userId;
         const hobby = newHobbyNode.data.label;
 
         try {
-          // Fetch the user data from the API
+          // Fetch the user data based on the userId
           const response = await axios.get(
             'https://cybernauts-backend.onrender.com/api/users'
           );
@@ -164,7 +146,7 @@ const FlowEditor: React.FC = () => {
 
           const updatedHobbies = [...user.hobbies, hobby];
 
-          // Send a PUT request to update the user's hobbies
+          // Send PUT request to update user hobbies
           await axios.put(
             `https://cybernauts-backend.onrender.com/api/users/${userId}`,
             {
@@ -174,37 +156,35 @@ const FlowEditor: React.FC = () => {
             }
           );
 
-          // Clear the new hobby node from the state
-          setNewHobbyNode(null);
+          setNewHobbyNode(null); // Clear the new hobby node after update
         } catch (error) {
           console.error('Error updating user hobbies:', error);
         }
       }
     },
-    [nodes, newHobbyNode] // Re-run when nodes or new hobby node changes
+    [nodes, newHobbyNode]
   );
 
   return (
     <div style={{ display: 'flex', height: '100vh' }}>
-      {/* Sidebar with draggable hobbies */}
+      {/* Sidebar with draggable hobby items */}
       <Sidebar hobbies={hobbies} onDragStart={onDragStart} />
-
+      
       <div
         style={{ flexGrow: 5, padding: '100px' }}
-        onDrop={onDrop} // Handle drop events here
-        onDragOver={onDragOver} // Allow drop by preventing default action
+        onDrop={onDrop}
+        onDragOver={onDragOver}
       >
-        {/* ReactFlow component to render the flowchart */}
         <ReactFlow
-          nodes={nodes} // Pass nodes to render
-          onNodesChange={onNodesChange} // Handle node changes (dragging)
-          edges={edges} // Pass edges to render
-          onEdgesChange={onEdgesChange} // Handle edge changes
-          onConnect={onConnect} // Handle new connections between nodes
-          fitView // Fit the flow to the screen
+          nodes={nodes}
+          onNodesChange={onNodesChange}
+          edges={edges}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          fitView
         >
-          <Background /> {/* Background grid */}
-          <Controls /> {/* Controls for zooming and panning */}
+          <Background />
+          <Controls />
         </ReactFlow>
       </div>
     </div>
